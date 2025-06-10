@@ -342,33 +342,44 @@ class DataProcessor:
         filtered_texts = []
         
         for text in texts:
-            # Basic quality checks
+            # Basic quality checks - made less strict
             if (
-                len(text.strip()) >= self.min_length and
-                len(text.split()) >= 3 and  # At least 3 words
+                len(text.strip()) >= max(self.min_length, 5) and  # At least 5 characters
+                len(text.split()) >= 2 and  # At least 2 words (reduced from 3)
                 not self._is_low_quality(text)
             ):
                 filtered_texts.append(text.strip())
         
         logger.info(f"Filtered {len(texts)} -> {len(filtered_texts)} texts")
+        
+        # If no texts pass filtering, keep all original texts with a warning
+        if len(filtered_texts) == 0:
+            logger.warning("No texts passed quality filtering. Keeping all original texts.")
+            return [text.strip() for text in texts if len(text.strip()) >= 1]
+        
         return filtered_texts
     
     def _is_low_quality(self, text: str) -> bool:
         """Check if text is low quality."""
-        # Simple heuristics for low-quality text
+        # Simple heuristics for low-quality text - made less strict
         text_lower = text.lower()
         
-        # Check for too many repeated characters
-        if any(char * 4 in text for char in "abcdefghijklmnopqrstuvwxyz"):
+        # Only reject if text is very short
+        if len(text.strip()) < 3:
             return True
         
-        # Check for too many non-alphabetic characters
-        alpha_ratio = sum(1 for c in text if c.isalpha()) / len(text)
-        if alpha_ratio < 0.6:
+        # Check for too many repeated characters (increased threshold)
+        if any(char * 6 in text for char in "abcdefghijklmnopqrstuvwxyz"):
             return True
         
-        # Check for spam-like patterns
-        spam_indicators = ["click here", "buy now", "!!!!", "????"]
+        # Check for too many non-alphabetic characters (reduced threshold)
+        if len(text) > 0:
+            alpha_ratio = sum(1 for c in text if c.isalpha()) / len(text)
+            if alpha_ratio < 0.3:  # Reduced from 0.6 to 0.3
+                return True
+        
+        # Check for spam-like patterns (only obvious spam)
+        spam_indicators = ["click here now", "buy now!!!", "call now", "free money"]
         if any(indicator in text_lower for indicator in spam_indicators):
             return True
         
@@ -397,6 +408,13 @@ class DataProcessor:
         Returns:
             Configured DataLoader
         """
+        # Check if dataset is empty
+        if len(dataset) == 0:
+            raise ValueError(
+                "Dataset is empty. This usually means the text data was filtered out. "
+                "Try using longer texts, reducing min_length, or disabling quality filtering."
+            )
+        
         # Collate function for padding
         def collate_fn(batch: List[Dict[str, torch.Tensor]]) -> Dict[str, torch.Tensor]:
             return self._collate_batch(batch)
@@ -517,3 +535,52 @@ class DataProcessor:
         }
         
         return stats
+    
+    def debug_filtering(self, texts: List[str]) -> Dict[str, Any]:
+        """
+        Debug why texts might be filtered out.
+        
+        Args:
+            texts: Input texts to analyze
+            
+        Returns:
+            Debug information about filtering
+        """
+        debug_info = {
+            "total_texts": len(texts),
+            "too_short": 0,
+            "too_few_words": 0,
+            "low_quality": 0,
+            "passed_filter": 0,
+            "failed_examples": []
+        }
+        
+        for i, text in enumerate(texts):
+            text_stripped = text.strip()
+            
+            # Check each filter condition
+            if len(text_stripped) < max(self.min_length, 5):
+                debug_info["too_short"] += 1
+                if len(debug_info["failed_examples"]) < 3:
+                    debug_info["failed_examples"].append({
+                        "text": text_stripped[:50] + "..." if len(text_stripped) > 50 else text_stripped,
+                        "reason": f"too_short (length: {len(text_stripped)}, min: {max(self.min_length, 5)})"
+                    })
+            elif len(text_stripped.split()) < 2:
+                debug_info["too_few_words"] += 1
+                if len(debug_info["failed_examples"]) < 3:
+                    debug_info["failed_examples"].append({
+                        "text": text_stripped[:50] + "..." if len(text_stripped) > 50 else text_stripped,
+                        "reason": f"too_few_words (words: {len(text_stripped.split())}, min: 2)"
+                    })
+            elif self._is_low_quality(text_stripped):
+                debug_info["low_quality"] += 1
+                if len(debug_info["failed_examples"]) < 3:
+                    debug_info["failed_examples"].append({
+                        "text": text_stripped[:50] + "..." if len(text_stripped) > 50 else text_stripped,
+                        "reason": "low_quality"
+                    })
+            else:
+                debug_info["passed_filter"] += 1
+        
+        return debug_info
