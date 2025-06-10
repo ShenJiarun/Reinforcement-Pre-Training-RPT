@@ -1,0 +1,267 @@
+# Reinforcement Pre-Training (RPT)
+
+A Python package implementing **Reinforcement Pre-Training** techniques for language models, based on the paper ["Reinforcement Pre-Training (RPT)"](https://arxiv.org/abs/2506.08007).
+
+## Overview
+
+This package provides a complete implementation of RPT, a novel approach that uses reinforcement learning to train language models by treating next-token prediction as reasoning tasks with verifiable rewards. RPT reframes traditional language modeling to incentivize next-token reasoning, leading to improved accuracy and more robust language understanding.
+
+## Key Features
+
+- 🧠 **Next-Token Reasoning**: Treats token prediction as reasoning tasks with verifiable rewards
+- 🚀 **Scalable Training**: Built-in support for distributed training and memory optimization
+- 📊 **Comprehensive Metrics**: Detailed evaluation tools for reasoning quality assessment
+- 🔧 **Easy Integration**: Simple API that works with existing Hugging Face models
+- ⚡ **Performance Optimized**: Mixed precision training, gradient checkpointing, and efficient batching
+- 📈 **Visualization Tools**: Built-in plotting and analysis capabilities
+
+## Installation
+
+### From PyPI (when published)
+```bash
+pip install reinforcement-pretraining
+```
+
+### From Source
+```bash
+git clone https://github.com/your-username/reinforcement-pretraining.git
+cd reinforcement-pretraining
+pip install -e .
+```
+
+### With Optional Dependencies
+```bash
+# For visualization
+pip install reinforcement-pretraining[viz]
+
+# For distributed training
+pip install reinforcement-pretraining[distributed]
+
+# For development
+pip install reinforcement-pretraining[dev]
+
+# Everything
+pip install reinforcement-pretraining[all]
+```
+
+## Quick Start
+
+### Basic Usage
+
+```python
+import torch
+from transformers import AutoTokenizer, AutoModel
+from rpt import RPTTrainer, RPTModel, RewardSystem, DataProcessor
+
+# Load a pre-trained model and tokenizer
+tokenizer = AutoTokenizer.from_pretrained("gpt2")
+base_model = AutoModel.from_pretrained("gpt2")
+
+# Create RPT model with value head
+rpt_model = RPTModel(
+    base_model=base_model,
+    tokenizer=tokenizer,
+    add_value_head=True
+)
+
+# Setup reward system
+reward_system = RewardSystem(
+    reward_type="hybrid",  # Combines accuracy and confidence
+    reward_scale=1.0
+)
+
+# Prepare your data
+data_processor = DataProcessor(tokenizer=tokenizer)
+texts = ["Your training texts here...", "Another example..."]
+dataset = data_processor.create_dataset(texts, split_ratio=0.9)
+train_dataset, val_dataset = dataset
+
+# Create data loaders
+train_loader = data_processor.create_dataloader(
+    train_dataset, 
+    batch_size=8, 
+    shuffle=True
+)
+val_loader = data_processor.create_dataloader(
+    val_dataset, 
+    batch_size=8, 
+    shuffle=False
+)
+
+# Setup optimizer
+optimizer = torch.optim.AdamW(rpt_model.parameters(), lr=5e-5)
+
+# Create trainer
+trainer = RPTTrainer(
+    model=rpt_model,
+    reward_system=reward_system,
+    optimizer=optimizer,
+    train_dataloader=train_loader,
+    val_dataloader=val_loader,
+    max_epochs=3,
+    output_dir="./rpt_output"
+)
+
+# Start training
+results = trainer.train()
+```
+
+### Advanced Usage with Scaling
+
+```python
+from rpt import ScalingUtils, ScalingConfig, RPTMetrics
+
+# Configure scaling for large models
+scaling_config = ScalingConfig(
+    use_distributed=True,
+    gradient_checkpointing=True,
+    mixed_precision=True,
+    auto_batch_size=True
+)
+
+scaling_utils = ScalingUtils(scaling_config)
+
+# Setup distributed training
+scaling_utils.setup_distributed_training()
+
+# Optimize model for memory efficiency
+rpt_model = scaling_utils.optimize_model_memory(rpt_model)
+
+# Wrap for distributed training
+rpt_model = scaling_utils.wrap_model_for_distributed(rpt_model)
+
+# Find optimal batch size
+optimal_batch_size = scaling_utils.get_optimal_batch_size(
+    model=rpt_model,
+    sample_input={"input_ids": torch.randint(0, 1000, (1, 512))},
+    device=torch.device("cuda")
+)
+
+print(f"Optimal batch size: {optimal_batch_size}")
+```
+
+### Data Processing
+
+```python
+# Load data from various formats
+texts = data_processor.load_text_data("path/to/data.jsonl", data_format="jsonl")
+
+# Apply quality filtering and create dataset
+dataset = data_processor.create_dataset(
+    texts=texts,
+    split_ratio=0.9,
+    shuffle=True,
+    filter_quality=True
+)
+
+# Get dataset statistics
+stats = data_processor.get_data_statistics(dataset[0])
+print(f"Dataset stats: {stats}")
+```
+
+### Metrics and Evaluation
+
+```python
+# Initialize metrics tracker
+metrics = RPTMetrics(track_detailed_stats=True)
+
+# During training, update metrics
+step_metrics = metrics.update_metrics(
+    step=100,
+    predictions=model_outputs["logits"],
+    targets=target_tokens,
+    rewards=computed_rewards,
+    attention_mask=attention_mask
+)
+
+# Get summary statistics
+summary = metrics.get_summary_stats(window_size=100)
+
+# Plot training progress
+metrics.plot_metrics(
+    metrics_to_plot=["token_accuracy", "avg_reward", "perplexity"],
+    save_path="training_metrics.png"
+)
+
+# Export metrics for analysis
+metrics.export_metrics("training_results.json")
+```
+
+## Examples
+
+Check out the `examples/` directory for complete training scripts:
+
+- `basic_pretraining.py`: Simple RPT training setup
+- `advanced_scaling.py`: Large-scale distributed training
+- `custom_rewards.py`: Implementing custom reward functions
+- `evaluation_analysis.py`: Comprehensive model evaluation
+
+## Core Components
+
+### RPTModel
+Wraps existing language models and adds RL training capabilities:
+- Value head for advantage estimation
+- Reasoning-based generation
+- Easy saving/loading
+
+### RewardSystem
+Implements verifiable rewards for next-token prediction:
+- Accuracy-based rewards
+- Confidence-based rewards
+- Adaptive reward scaling
+- Custom reward functions
+
+### RPTTrainer
+Main training loop with PPO-style optimization:
+- Gradient accumulation
+- Mixed precision training
+- Comprehensive logging
+- Automatic checkpointing
+
+### ScalingUtils
+Tools for scaling to large models and datasets:
+- Distributed training setup
+- Memory optimization
+- Automatic batch sizing
+- System monitoring
+
+### DataProcessor
+Utilities for preparing text data:
+- Multiple format support
+- Quality filtering
+- Reasoning augmentation
+- Efficient batching
+
+## Citation
+
+If you use this package in your research, please cite the original paper:
+
+```bibtex
+@article{rpt2024,
+  title={Reinforcement Pre-Training (RPT)},
+  author={[Authors]},
+  journal={arXiv preprint arXiv:2506.08007},
+  year={2024}
+}
+```
+
+## Contributing
+
+We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+
+## License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## Support
+
+- 📖 **Documentation**: [Read the Docs](https://reinforcement-pretraining.readthedocs.io/)
+- 🐛 **Issues**: [GitHub Issues](https://github.com/your-username/reinforcement-pretraining/issues)
+- 💬 **Discussions**: [GitHub Discussions](https://github.com/your-username/reinforcement-pretraining/discussions)
+
+## Acknowledgments
+
+- Original RPT paper authors
+- Hugging Face Transformers team
+- PyTorch team
+- The open-source AI community

@@ -1,0 +1,3 @@
+[console_scripts]
+rpt-eval = rpt.cli:eval_cli
+rpt-train = rpt.cli:train_cli
