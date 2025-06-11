@@ -5,9 +5,13 @@ Summary: Reinforcement Pre-Training for Language Models - Implementation of ArXi
 Home-page: https://github.com/your-username/reinforcement-pretraining
 Author: RPT Package Authors
 Author-email: 
-Project-URL: Bug Reports, https://github.com/your-username/reinforcement-pretraining/issues
-Project-URL: Source, https://github.com/your-username/reinforcement-pretraining
-Project-URL: Documentation, https://reinforcement-pretraining.readthedocs.io/
+Maintainer: RPT Package Authors
+License: MIT
+Project-URL: Homepage, https://github.com/ProCreations-Official/reinforcement-pretraining
+Project-URL: Documentation, https://github.com/ProCreations-Official/reinforcement-pretraining#readme
+Project-URL: Repository, https://github.com/ProCreations-Official/reinforcement-pretraining
+Project-URL: Issues, https://github.com/ProCreations-Official/reinforcement-pretraining/issues
+Project-URL: Paper, https://arxiv.org/abs/2506.08007
 Keywords: reinforcement learning,language models,pre-training,AI,NLP,deep learning
 Classifier: Development Status :: 3 - Alpha
 Classifier: Intended Audience :: Developers
@@ -23,6 +27,7 @@ Classifier: Programming Language :: Python :: 3.11
 Classifier: Operating System :: OS Independent
 Requires-Python: >=3.8
 Description-Content-Type: text/markdown
+License-File: LICENSE
 Requires-Dist: torch>=2.0.0
 Requires-Dist: transformers>=4.30.0
 Requires-Dist: numpy>=1.21.0
@@ -64,17 +69,9 @@ Requires-Dist: seaborn>=0.11.0; extra == "all"
 Requires-Dist: plotly>=5.0.0; extra == "all"
 Requires-Dist: deepspeed>=0.9.0; extra == "all"
 Requires-Dist: accelerate>=0.20.0; extra == "all"
-Dynamic: author
-Dynamic: classifier
-Dynamic: description
-Dynamic: description-content-type
 Dynamic: home-page
-Dynamic: keywords
-Dynamic: project-url
-Dynamic: provides-extra
-Dynamic: requires-dist
+Dynamic: license-file
 Dynamic: requires-python
-Dynamic: summary
 
 # Reinforcement Pre-Training (RPT)
 

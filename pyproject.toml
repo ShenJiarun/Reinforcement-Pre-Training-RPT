@@ -1,0 +1,103 @@
+[build-system]
+requires = ["setuptools>=45", "wheel", "setuptools_scm"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "reinforcement-pretraining"
+version = "0.1.0"
+description = "Reinforcement Pre-Training for Language Models - Implementation of ArXiv:2506.08007"
+readme = "README.md"
+license = {text = "MIT"}
+authors = [
+    {name = "RPT Package Authors"},
+]
+maintainers = [
+    {name = "RPT Package Authors"},
+]
+keywords = ["reinforcement learning", "language models", "pre-training", "AI", "NLP", "deep learning"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Operating System :: OS Independent",
+]
+requires-python = ">=3.8"
+dependencies = [
+    "torch>=2.0.0",
+    "transformers>=4.30.0",
+    "numpy>=1.21.0",
+    "tqdm>=4.64.0",
+    "psutil>=5.9.0",
+    "datasets>=2.12.0",
+    "tokenizers>=0.13.0",
+    "GPUtil>=1.4.0",
+    "pyyaml>=6.0",
+    "tensorboard>=2.13.0",
+    "scipy>=1.9.0",
+    "scikit-learn>=1.3.0",
+    "accelerate>=0.20.0",
+    "matplotlib>=3.5.0",
+    "seaborn>=0.11.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=6.0",
+    "pytest-cov",
+    "black",
+    "flake8",
+    "isort",
+    "mypy",
+]
+viz = [
+    "matplotlib>=3.5.0",
+    "seaborn>=0.11.0",
+    "plotly>=5.0.0",
+]
+distributed = [
+    "deepspeed>=0.9.0",
+    "accelerate>=0.20.0",
+]
+all = [
+    "pytest>=6.0",
+    "pytest-cov",
+    "black",
+    "flake8",
+    "isort",
+    "mypy",
+    "matplotlib>=3.5.0",
+    "seaborn>=0.11.0",
+    "plotly>=5.0.0",
+    "deepspeed>=0.9.0",
+    "accelerate>=0.20.0",
+]
+
+[project.scripts]
+rpt-train = "rpt.cli:train_cli"
+rpt-eval = "rpt.cli:eval_cli"
+
+[project.urls]
+Homepage = "https://github.com/ProCreations-Official/reinforcement-pretraining"
+Documentation = "https://github.com/ProCreations-Official/reinforcement-pretraining#readme"
+Repository = "https://github.com/ProCreations-Official/reinforcement-pretraining"
+Issues = "https://github.com/ProCreations-Official/reinforcement-pretraining/issues"
+"Paper" = "https://arxiv.org/abs/2506.08007"
+
+[tool.setuptools]
+package-dir = {"" = "."}
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["rpt*"]
+exclude = ["tests*", "docs*"]
+
+[tool.setuptools.package-data]
+rpt = ["*.yaml", "*.json"]
