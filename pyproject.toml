@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "reinforcement-pretraining"
-version = "0.1.0"
+version = "0.2.0"
 description = "Reinforcement Pre-Training for Language Models - Implementation of ArXiv:2506.08007"
 readme = "README.md"
 license = {text = "MIT"}

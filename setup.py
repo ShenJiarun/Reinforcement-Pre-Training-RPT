@@ -14,7 +14,7 @@ with open("requirements.txt", "r", encoding="utf-8") as fh:
     requirements = [line.strip() for line in fh if line.strip() and not line.startswith("#")]
 
 # Version
-version = "0.1.0"
+version = "0.2.0"
 
 setup(
     name="reinforcement-pretraining",
