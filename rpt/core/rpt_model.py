@@ -65,7 +65,7 @@ class RPTModel(nn.Module):
         else:
             self.lm_head = self.base_model.lm_head
             
-        # Value head for RL training
+        # Value head for RL training (FIXED: proper initialization)
         if add_value_head:
             self.value_head = nn.Sequential(
                 nn.Linear(self.hidden_size, self.hidden_size // 2),
@@ -73,6 +73,14 @@ class RPTModel(nn.Module):
                 nn.Dropout(0.1),
                 nn.Linear(self.hidden_size // 2, value_head_dim)
             )
+            # CRITICAL: Initialize value head to output small values near 0
+            with torch.no_grad():
+                for module in self.value_head:
+                    if isinstance(module, nn.Linear):
+                        # Small weight initialization
+                        module.weight.normal_(0, 0.01)
+                        if module.bias is not None:
+                            module.bias.fill_(0.0)
         else:
             self.value_head = None
             

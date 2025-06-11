@@ -25,7 +25,7 @@ from .utils.scaling import ScalingUtils
 from .utils.metrics import RPTMetrics
 from .utils.data_utils import DataProcessor
 
-__version__ = "0.1.0"
+__version__ = "0.1.1"
 __author__ = "RPT Package Authors"
 __description__ = "Reinforcement Pre-Training for Language Models"
 
