@@ -17,7 +17,7 @@ This package provides a complete implementation of RPT, a novel approach that us
 
 ## Installation
 
-### From PyPI (when published)
+### From PyPI
 ```bash
 pip install reinforcement-pretraining
 ```
