@@ -34,7 +34,8 @@ class RPTDataset(Dataset):
         min_length: int = 10,
         add_special_tokens: bool = True,
         return_attention_mask: bool = True,
-        reasoning_augmentation: bool = False
+        reasoning_augmentation: bool = False,
+        preprocessing_batch_size: int = 32,
     ):
         """
         Initialize RPT dataset.
@@ -55,48 +56,59 @@ class RPTDataset(Dataset):
         self.add_special_tokens = add_special_tokens
         self.return_attention_mask = return_attention_mask
         self.reasoning_augmentation = reasoning_augmentation
+        self.preprocessing_batch_size = preprocessing_batch_size
         
         # Pre-tokenize texts for efficiency
         self.tokenized_texts = self._preprocess_texts()
         
     def _preprocess_texts(self) -> List[Dict[str, torch.Tensor]]:
-        """Preprocess and tokenize all texts."""
-        tokenized = []
-        
+        """Preprocess and tokenize all texts using batching for speed."""
+        from types import SimpleNamespace
+
+        tokenized: List[Dict[str, torch.Tensor]] = []
         logger.info(f"Preprocessing {len(self.texts)} texts...")
-        
-        for i, text in enumerate(self.texts):
+
+        batch_size = max(1, self.preprocessing_batch_size)
+
+        for start in range(0, len(self.texts), batch_size):
+            batch_texts = self.texts[start:start + batch_size]
             try:
-                # Tokenize text
-                encoding = self.tokenizer(
-                    text,
+                enc = self.tokenizer(
+                    batch_texts,
                     max_length=self.max_length,
                     truncation=True,
-                    padding=False,
+                    padding=True,
                     add_special_tokens=self.add_special_tokens,
-                    return_tensors="pt"
+                    return_tensors="pt",
                 )
-                
-                # Check minimum length
-                if encoding.input_ids.shape[1] >= self.min_length:
-                    tokenized_item = {
-                        "input_ids": encoding.input_ids.squeeze(0),
-                        "text": text
-                    }
-                    
-                    if self.return_attention_mask:
-                        tokenized_item["attention_mask"] = encoding.attention_mask.squeeze(0)
-                    
-                    # Add reasoning augmentation if enabled
+
+                input_ids_batch = enc["input_ids"]
+                attn_batch = enc.get("attention_mask")
+
+                for idx, text in enumerate(batch_texts):
+                    ids = input_ids_batch[idx]
+                    mask = attn_batch[idx] if attn_batch is not None else None
+                    length = int(mask.sum()) if mask is not None else len(ids)
+
+                    if length < self.min_length:
+                        continue
+
+                    ids = ids[:length]
+                    item = {"input_ids": ids, "text": text}
+
+                    if self.return_attention_mask and mask is not None:
+                        item["attention_mask"] = mask[:length]
+
                     if self.reasoning_augmentation:
-                        tokenized_item.update(self._apply_reasoning_augmentation(encoding, text))
-                    
-                    tokenized.append(tokenized_item)
-                    
+                        encoding_ns = SimpleNamespace(input_ids=ids.unsqueeze(0))
+                        item.update(self._apply_reasoning_augmentation(encoding_ns, text))
+
+                    tokenized.append(item)
+
             except Exception as e:
-                logger.warning(f"Error processing text {i}: {e}")
+                logger.warning(f"Error processing texts {start}-{start+len(batch_texts)-1}: {e}")
                 continue
-        
+
         logger.info(f"Preprocessed {len(tokenized)} valid texts")
         return tokenized
     
@@ -156,7 +168,8 @@ class DataProcessor:
         tokenizer: Union[str, PreTrainedTokenizer],
         max_length: int = 512,
         min_length: int = 10,
-        reasoning_augmentation: bool = False
+        reasoning_augmentation: bool = False,
+        preprocessing_batch_size: int = 32,
     ):
         """
         Initialize data processor.
@@ -179,6 +192,7 @@ class DataProcessor:
         self.max_length = max_length
         self.min_length = min_length
         self.reasoning_augmentation = reasoning_augmentation
+        self.preprocessing_batch_size = preprocessing_batch_size
         
     def load_text_data(
         self,
@@ -306,7 +320,8 @@ class DataProcessor:
                 tokenizer=self.tokenizer,
                 max_length=self.max_length,
                 min_length=self.min_length,
-                reasoning_augmentation=self.reasoning_augmentation
+                reasoning_augmentation=self.reasoning_augmentation,
+                preprocessing_batch_size=self.preprocessing_batch_size,
             )
             
             val_dataset = RPTDataset(
@@ -314,7 +329,8 @@ class DataProcessor:
                 tokenizer=self.tokenizer,
                 max_length=self.max_length,
                 min_length=self.min_length,
-                reasoning_augmentation=False  # No augmentation for validation
+                reasoning_augmentation=False,  # No augmentation for validation
+                preprocessing_batch_size=self.preprocessing_batch_size,
             )
             
             return train_dataset, val_dataset
@@ -324,7 +340,8 @@ class DataProcessor:
                 tokenizer=self.tokenizer,
                 max_length=self.max_length,
                 min_length=self.min_length,
-                reasoning_augmentation=self.reasoning_augmentation
+                reasoning_augmentation=self.reasoning_augmentation,
+                preprocessing_batch_size=self.preprocessing_batch_size,
             )
             
             return dataset
