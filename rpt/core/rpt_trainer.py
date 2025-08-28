@@ -37,6 +37,7 @@ class RPTTrainer:
     def __init__(
         self,
         model: RPTModel,
+        tokenizer,
         reward_system: RewardSystem,
         optimizer: Optimizer,
         train_dataloader: DataLoader,
@@ -53,7 +54,8 @@ class RPTTrainer:
         ppo_epochs: int = 4,
         ppo_clip_param: float = 0.2,
         value_loss_coef: float = 0.5,
-        entropy_coef: float = 0.01
+        entropy_coef: float = 0.01,
+        n_samples_per_prompt: int = 8
     ):
         """
         Initialize RPT Trainer.
@@ -80,9 +82,11 @@ class RPTTrainer:
         """
         self.model = model
         self.reward_system = reward_system
+        self.tokenizer = tokenizer
         self.optimizer = optimizer
         self.train_dataloader = train_dataloader
         self.val_dataloader = val_dataloader
+        self.n_samples_per_prompt = n_samples_per_prompt
         
         self.max_epochs = max_epochs
         self.gradient_accumulation_steps = gradient_accumulation_steps
@@ -211,6 +215,16 @@ class RPTTrainer:
         """
         input_ids = batch["input_ids"]
         attention_mask = batch.get("attention_mask")
+
+        generation_kwargs = {}
+        
+        generation_kwargs['max_new_tokens'] = 512
+        generation_kwargs['min_new_tokens'] = 0
+        generation_kwargs['pad_token_id'] = self.tokenizer.pad_token_id
+        generation_kwargs['do_sample'] = True
+        generation_kwargs['temperature'] = 1.0
+        generation_kwargs['top_k'] = 50
+        generation_kwargs['top_p'] = 0.9
         
         # Shift for next-token prediction
         targets = input_ids[:, 1:].contiguous()
@@ -221,9 +235,16 @@ class RPTTrainer:
         
         # Get model outputs
         with torch.cuda.amp.autocast(enabled=self.mixed_precision):
-            outputs = self.model(input_ids=inputs, attention_mask=attention_mask)
-            logits = outputs["logits"]
-            values = outputs.get("values")
+            # outputs = self.model(input_ids=inputs, attention_mask=attention_mask)
+            model_generations = []
+            for _ in range(self.n_samples_per_prompt):
+                model_outputs = self.model.base_model.generate(input_ids=inputs, attention_mask=attention_mask, **generation_kwargs)
+                outputs = model_outputs[:, inputs.shape[1]:]
+                decodeds = self.tokenizer.batch_decode(outputs, skip_special_tokens=True)
+                model_generations.append(decodeds)
+
+            # logits = model_outputs["logits"]
+            # values = model_outputs.get("values")
             
             # Compute rewards
             rewards = self.reward_system.compute_rewards(
@@ -408,6 +429,7 @@ class RPTTrainer:
         
         # Aggregate results
         avg_results = {}
+        eval_logs[0]['reward'] = eval_logs[0].get('mean_reward')  # Rename for consistency
         for key in eval_logs[0].keys():
             avg_results[f"avg_{key}"] = np.mean([log[key] for log in eval_logs])
             

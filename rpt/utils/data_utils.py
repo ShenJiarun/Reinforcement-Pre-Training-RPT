@@ -29,6 +29,7 @@ class RPTDataset(Dataset):
     def __init__(
         self,
         texts: List[str],
+        labels: List[str],
         tokenizer: PreTrainedTokenizer,
         max_length: int = 512,
         min_length: int = 10,
@@ -51,6 +52,7 @@ class RPTDataset(Dataset):
         """
         self.texts = texts
         self.tokenizer = tokenizer
+        self.labels = labels
         self.max_length = max_length
         self.min_length = min_length
         self.add_special_tokens = add_special_tokens
@@ -155,7 +157,11 @@ class RPTDataset(Dataset):
         return len(self.tokenized_texts)
     
     def __getitem__(self, idx: int) -> Dict[str, torch.Tensor]:
-        return self.tokenized_texts[idx]
+        res = {
+            'input_ids': self.tokenized_texts[idx],
+            'labels': self.labels[idx]
+        }
+        return res
 
 
 class DataProcessor:
@@ -285,6 +291,7 @@ class DataProcessor:
     def create_dataset(
         self,
         texts: List[str],
+        labels: List[str],
         split_ratio: Optional[float] = None,
         shuffle: bool = True,
         filter_quality: bool = True
@@ -317,6 +324,7 @@ class DataProcessor:
             
             train_dataset = RPTDataset(
                 texts=train_texts,
+                labels=labels,
                 tokenizer=self.tokenizer,
                 max_length=self.max_length,
                 min_length=self.min_length,
