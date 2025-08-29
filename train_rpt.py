@@ -208,7 +208,7 @@ device = "cuda" if torch.cuda.is_available() else "cpu"
 print("\nComputing token entropy for prompts...")
 results, all_entropies = analyze_prompts_entropy(proxy_model, proxy_tokenizer, prompts, device)
 
-# Determine threshold (using 75th percentile as default)
+# Determine threshold (using 95th percentile as default)
 # You can adjust the percentile to be more or less strict
 threshold = determine_threshold(all_entropies, percentile=95)
 
@@ -229,11 +229,14 @@ for index, prompt in enumerate(prompts):
     prompt_tmp = []
     label_tmp = []
     high_entropy_indices = results_metrics['filtered_results'][index]['high_entropy_indices']
+    tokenized_tokens = results_metrics['results'][index]['tokens']
+
     for i in high_entropy_indices:
         if i == 0 or i <= len(prompt) // 4:
             continue
-        prompt_tmp.append(CONTENT_PROMPT.format(CONTEXT=prompts[index][:i]))
-        label_tmp.append(prompts[index][i])
+        prompt_tmp.append("".join(tokenized_tokens[:i]))
+        label_tmp.append(tokenized_tokens[i])
+
     labels.extend(label_tmp)
     separate_prompts.extend(prompt_tmp)
 
@@ -254,7 +257,7 @@ rpt_model = RPTModel(
 
 # Setup reward system
 reward_system = RewardSystem(
-    reward_type="reward",  # Combines accuracy and confidence
+    reward_type="accuracy",  # Combines accuracy and confidence
     reward_scale=1.0
 )
 
@@ -268,7 +271,7 @@ train_dataset, val_dataset = dataset
 train_loader = data_processor.create_dataloader(
     train_dataset, 
     batch_size=1, 
-    shuffle=True
+    shuffle=False
 )
 val_loader = data_processor.create_dataloader(
     val_dataset, 

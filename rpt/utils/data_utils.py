@@ -74,6 +74,7 @@ class RPTDataset(Dataset):
 
         for start in range(0, len(self.texts), batch_size):
             batch_texts = self.texts[start:start + batch_size]
+            batch_labels = self.labels[start:start + batch_size]
             try:
                 enc = self.tokenizer(
                     batch_texts,
@@ -86,8 +87,19 @@ class RPTDataset(Dataset):
 
                 input_ids_batch = enc["input_ids"]
                 attn_batch = enc.get("attention_mask")
+                
+                encoded_labels = self.tokenizer(
+                    batch_labels,
+                    max_length=self.max_length,
+                    truncation=True,
+                    padding=True,
+                    add_special_tokens=self.add_special_tokens,
+                    return_tensors="pt",
+                )
+                batch_labels = encoded_labels["input_ids"]
 
-                for idx, text in enumerate(batch_texts):
+                for idx, data in enumerate(zip(batch_texts, batch_labels)):
+                    text, label = data
                     ids = input_ids_batch[idx]
                     mask = attn_batch[idx] if attn_batch is not None else None
                     length = int(mask.sum()) if mask is not None else len(ids)
@@ -96,7 +108,7 @@ class RPTDataset(Dataset):
                         continue
 
                     ids = ids[:length]
-                    item = {"input_ids": ids, "text": text}
+                    item = {"input_ids": ids, "text": text, "labels": label}
 
                     if self.return_attention_mask and mask is not None:
                         item["attention_mask"] = mask[:length]
@@ -157,11 +169,7 @@ class RPTDataset(Dataset):
         return len(self.tokenized_texts)
     
     def __getitem__(self, idx: int) -> Dict[str, torch.Tensor]:
-        res = {
-            'input_ids': self.tokenized_texts[idx],
-            'labels': self.labels[idx]
-        }
-        return res
+        return self.tokenized_texts[idx]
 
 
 class DataProcessor:
@@ -321,10 +329,12 @@ class DataProcessor:
             split_idx = int(len(texts) * split_ratio)
             train_texts = texts[:split_idx]
             val_texts = texts[split_idx:]
+            train_labels = labels[:split_idx]
+            val_labels = labels[split_idx:]
             
             train_dataset = RPTDataset(
                 texts=train_texts,
-                labels=labels,
+                labels=train_labels,
                 tokenizer=self.tokenizer,
                 max_length=self.max_length,
                 min_length=self.min_length,
@@ -334,6 +344,7 @@ class DataProcessor:
             
             val_dataset = RPTDataset(
                 texts=val_texts,
+                labels=val_labels,
                 tokenizer=self.tokenizer,
                 max_length=self.max_length,
                 min_length=self.min_length,
@@ -474,12 +485,12 @@ class DataProcessor:
         # Get all keys from the first item
         keys = batch[0].keys()
         collated = {}
-        
+
         for key in keys:
             if key == "text":
                 # Keep text as list
                 collated[key] = [item[key] for item in batch]
-            elif key in ["input_ids", "attention_mask", "reasoning_mask", "reasoning_weight"]:
+            elif key in ["input_ids", "attention_mask", "reasoning_mask", "reasoning_weight", "labels"]:
                 # Pad sequences
                 sequences = [item[key] for item in batch]
                 

@@ -4,11 +4,11 @@ Reward System for Reinforcement Pre-Training
 This module implements the reward mechanism for next-token prediction,
 treating it as a reasoning task with verifiable rewards.
 """
+import re
 
 import torch
 import torch.nn.functional as F
 from typing import Dict, List, Optional, Tuple, Union
-import numpy as np
 
 
 class RewardSystem:
@@ -40,6 +40,7 @@ class RewardSystem:
         self.confidence_threshold = confidence_threshold
         self.reward_type = reward_type
         self.temperature = temperature
+        self.device = "cuda" if torch.cuda.is_available() else "cpu"
         
     def compute_rewards(
         self,
@@ -58,39 +59,58 @@ class RewardSystem:
         Returns:
             Rewards tensor [batch_size, seq_len]
         """
-        batch_size, seq_len, vocab_size = predictions.shape
-        
-        # Apply softmax to get probabilities
-        probs = F.softmax(predictions / self.temperature, dim=-1)
-        
-        # Get predicted token probabilities
-        predicted_probs = torch.gather(probs, dim=-1, index=targets.unsqueeze(-1)).squeeze(-1)
-        
         if self.reward_type == "accuracy":
             rewards = self._accuracy_rewards(predictions, targets)
-        elif self.reward_type == "confidence":
-            rewards = self._confidence_rewards(predicted_probs)
-        elif self.reward_type == "hybrid":
-            acc_rewards = self._accuracy_rewards(predictions, targets)
-            conf_rewards = self._confidence_rewards(predicted_probs)
-            rewards = 0.5 * acc_rewards + 0.5 * conf_rewards
         else:
             raise ValueError(f"Unknown reward type: {self.reward_type}")
-        
+        # currently not supported
+        # elif self.reward_type == "confidence":
+        #     rewards = self._confidence_rewards(predicted_probs)
+        # elif self.reward_type == "hybrid":
+        #     acc_rewards = self._accuracy_rewards(predictions, targets)
+        #     conf_rewards = self._confidence_rewards(predicted_probs)
+        #     rewards = 0.5 * acc_rewards + 0.5 * conf_rewards
+
         # Apply attention mask if provided
-        if attention_mask is not None:
-            rewards = rewards * attention_mask.float()
+        # if attention_mask is not None:
+        #     rewards = rewards * attention_mask.float()
             
         # CRITICAL: Clamp final rewards to prevent loss explosion
         final_rewards = rewards * self.reward_scale
         final_rewards = torch.clamp(final_rewards, -1.0, 1.0)  # Keep rewards reasonable
         return final_rewards
     
-    def _accuracy_rewards(self, predictions: torch.Tensor, targets: torch.Tensor) -> torch.Tensor:
-        """Compute accuracy-based rewards."""
-        predicted_tokens = torch.argmax(predictions, dim=-1)
-        correct_predictions = (predicted_tokens == targets).float()
-        return correct_predictions
+    def _accuracy_rewards(self,
+                        predictions: List[str],
+                        targets: str) -> torch.Tensor:
+        """
+        Return a 1-D tensor of length len(predictions) with per-sample scores.
+        Exact-match by default (1 if prediction == target, else 0).
+        """
+        def normalize(s: str) -> str:
+            s = s.strip()
+            # extract the boxed answer if present
+            boxed = re.findall(r'\\boxed\{([^}]*)\}', s)
+            return boxed[-1] if boxed else s
+
+        target_norm = normalize(targets[0])
+        rewards = []
+        for pred in predictions:
+            pred_norm = normalize(pred)
+            reward = 1.0 if pred_norm == target_norm else 0.0
+            # --- softer alternative: token-level F1
+            # pred_tokens = set(pred_norm.split())
+            # tgt_tokens  = set(target_norm.split())
+            # if not pred_tokens and not tgt_tokens:
+            #     reward = 1.0
+            # else:
+            #     overlap = len(pred_tokens & tgt_tokens)
+            #     prec      = overlap / len(pred_tokens) if pred_tokens else 0
+            #     rec       = overlap / len(tgt_tokens)  if tgt_tokens  else 0
+            #     reward    = 2 * prec * rec / (prec + rec) if (prec + rec) else 0
+            rewards.append(reward)
+
+        return torch.tensor(rewards, dtype=torch.float32, device=self.device)
     
     def _confidence_rewards(self, predicted_probs: torch.Tensor) -> torch.Tensor:
         """Compute confidence-based rewards."""

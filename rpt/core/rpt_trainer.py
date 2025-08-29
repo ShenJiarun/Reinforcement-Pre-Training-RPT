@@ -169,9 +169,9 @@ class RPTTrainer:
     def _train_epoch(self) -> List[Dict[str, float]]:
         """Train for one epoch."""
         epoch_logs = []
-        
+
         progress_bar = tqdm(self.train_dataloader, desc=f"Epoch {self.epoch + 1}")
-        
+
         for batch_idx, batch in enumerate(progress_bar):
             # Move batch to device
             batch = {k: v.to(self.device) if torch.is_tensor(v) else v for k, v in batch.items()}
@@ -214,11 +214,12 @@ class RPTTrainer:
             Training step logs
         """
         input_ids = batch["input_ids"]
+        labels = batch.get("labels")
         attention_mask = batch.get("attention_mask")
 
         generation_kwargs = {}
         
-        generation_kwargs['max_new_tokens'] = 512
+        generation_kwargs['max_new_tokens'] = 1024
         generation_kwargs['min_new_tokens'] = 0
         generation_kwargs['pad_token_id'] = self.tokenizer.pad_token_id
         generation_kwargs['do_sample'] = True
@@ -241,15 +242,12 @@ class RPTTrainer:
                 model_outputs = self.model.base_model.generate(input_ids=inputs, attention_mask=attention_mask, **generation_kwargs)
                 outputs = model_outputs[:, inputs.shape[1]:]
                 decodeds = self.tokenizer.batch_decode(outputs, skip_special_tokens=True)
-                model_generations.append(decodeds)
+                model_generations.extend(decodeds)
 
-            # logits = model_outputs["logits"]
-            # values = model_outputs.get("values")
-            
             # Compute rewards
             rewards = self.reward_system.compute_rewards(
-                predictions=logits,
-                targets=targets,
+                predictions=model_generations,
+                targets=self.tokenizer.batch_decode(labels, skip_special_tokens=True),
                 attention_mask=attention_mask
             )
             
